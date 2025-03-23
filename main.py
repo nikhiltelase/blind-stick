@@ -46,6 +46,13 @@ def beep(duration=0.1, pause=0.1, count=1):
         if _ < count - 1:  # Don't pause after the last beep
             time.sleep(pause)
 
+# Function to stop the buzzer
+def stop_buzzer():
+    global finding_mode
+    finding_mode = False
+    BUZZER.off()
+    LED.off()
+
 # Function to connect to WiFi
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
@@ -98,8 +105,13 @@ def handle_request(client):
     global finding_mode, last_find_request
     
     try:
-        client.settimeout(3.0)  # Set timeout for client operations
+        # Set a timeout for receiving data to prevent hanging
+        client.settimeout(2.0)  # 2 second timeout
+        
         request = client.recv(1024)
+        if not request:
+            raise Exception("Empty request received")
+            
         request = request.decode('utf-8')
         
         # Parse the request
@@ -107,7 +119,13 @@ def handle_request(client):
         method, path, _ = request_line.split(' ')
         
         # Handle different endpoints
-        if path == '/find':
+        if path == '/stop':
+            stop_buzzer()
+            response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\nBuzzer stopped"
+            client.send(response)
+            print("Stop request received")
+            
+        elif path == '/find':
             # Activate "find mode" for the stick
             finding_mode = True
             last_find_request = time.time()
@@ -141,20 +159,24 @@ def handle_request(client):
             client.send(response)
             
     except socket.timeout:
-        print("Request timed out")
-    except OSError as e:
-        if e.errno == 110:  # ETIMEDOUT
-            print("Connection timed out")
-        else:
-            print("Network error:", e)
+        print("Request timed out - client didn't send data in time")
+        try:
+            # Send a simple response when timeout occurs
+            error_response = "HTTP/1.1 408 Request Timeout\r\nContent-Type: text/plain\r\n\r\nRequest timeout"
+            client.send(error_response)
+        except:
+            pass
     except Exception as e:
         print("Error handling request:", e)
+        try:
+            # Send error response
+            error_response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nServer error"
+            client.send(error_response)
+        except:
+            pass
         
     finally:
-        try:
-            client.close()
-        except:
-            pass  # Ignore errors when closing an already closed connection
+        client.close()
 
 # Main function
 def main():
@@ -194,7 +216,8 @@ def main():
             
             # Regular distance checking
             distance = get_distance()
-            print("Distance:", distance, "cm")
+            if distance > 0:  # Only print valid readings
+                print("Distance:", distance, "cm")
             
             # Handle obstacle detection
             if 0 < distance < 50:  # Obstacle detected within 50cm

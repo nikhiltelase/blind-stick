@@ -223,26 +223,43 @@
             function initSpeech() {
                 if (speechInitialized) return;
                 
-                // Create a silent utterance to initialize speech on mobile
-                utterance = new SpeechSynthesisUtterance('');
-                utterance.volume = 0;
-                synth.speak(utterance);
-                speechInitialized = true;
+                // For Chrome on Android, we need a user interaction
+                if (isAndroid() && /Chrome/.test(navigator.userAgent)) {
+                    document.addEventListener('touchstart', function initTouch() {
+                        utterance = new SpeechSynthesisUtterance('');
+                        synth.speak(utterance);
+                        document.removeEventListener('touchstart', initTouch);
+                        speechInitialized = true;
+                    }, { once: true });
+                } else {
+                    utterance = new SpeechSynthesisUtterance('');
+                    utterance.volume = 0;
+                    synth.speak(utterance);
+                    speechInitialized = true;
+                }
             }
             
             // Speak function with better mobile support
             function speak(text) {
                 // Cancel any ongoing speech
-                if (synth.speaking) {
-                    synth.cancel();
-                }
+                synth.cancel();
                 
                 // Create a new utterance
                 utterance = new SpeechSynthesisUtterance(text);
                 
-                // Workaround for iOS
-                if (isIOS()) {
-                    // iOS often needs a small delay
+                // Set speech properties for better mobile compatibility
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                
+                // Add error handling
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event);
+                };
+
+                // For Chrome on Android, ensure we resume audio context
+                if (isAndroid() && /Chrome/.test(navigator.userAgent)) {
+                    // Add a small delay for mobile Chrome
                     setTimeout(() => {
                         synth.speak(utterance);
                     }, 100);
