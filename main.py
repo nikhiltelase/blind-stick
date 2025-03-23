@@ -118,10 +118,24 @@ def handle_request(client):
         request_line = request.split('\r\n')[0]
         method, path, _ = request_line.split(' ')
         
+        # Common headers for all responses
+        common_headers = (
+            "HTTP/1.1 200 OK\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+            "Access-Control-Allow-Headers: Content-Type\r\n"
+        )
+        
+        # Handle OPTIONS preflight request
+        if method == 'OPTIONS':
+            response = common_headers + "\r\n"
+            client.send(response)
+            return
+            
         # Handle different endpoints
         if path == '/stop':
             stop_buzzer()
-            response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\nBuzzer stopped"
+            response = common_headers + "Content-Type: text/plain\r\n\r\nBuzzer stopped"
             client.send(response)
             print("Stop request received")
             
@@ -130,7 +144,7 @@ def handle_request(client):
             finding_mode = True
             last_find_request = time.time()
             
-            response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\nFinding stick..."
+            response = common_headers + "Content-Type: text/plain\r\n\r\nFinding stick..."
             client.send(response)
             print("Find request received")
             
@@ -148,13 +162,12 @@ def handle_request(client):
                 "battery": "unknown"  # You could add battery monitoring
             }
             
-            response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
-            response += str(status)
+            response = common_headers + "Content-Type: application/json\r\n\r\n" + str(status)
             client.send(response)
             
         else:
             # Default homepage
-            response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
+            response = common_headers + "Content-Type: text/html\r\n\r\n"
             response += "<html><body><h1>Blind Stick Server</h1><p>Use /find to locate the stick</p></body></html>"
             client.send(response)
             

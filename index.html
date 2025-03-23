@@ -101,6 +101,9 @@
         
         <div class="status-container">
             <div class="status" id="status">Ready to locate your stick</div>
+            <div id="networkWarning" style="color: #e74c3c; margin-top: 10px; display: none;">
+                Warning: This site is running on HTTPS. Make sure you're on the same local network as the device.
+            </div>
         </div>
         
         <div class="button-container">
@@ -119,32 +122,47 @@
             const stopBtn = document.getElementById('stopBtn');
             const statusText = document.getElementById('status');
             const ipAddressInput = document.getElementById('ipAddress');
+            const networkWarning = document.getElementById('networkWarning');
             
+            // Show warning if we're on HTTPS
+            if (window.location.protocol === 'https:') {
+                networkWarning.style.display = 'block';
+            }
+
             function updateStatus(message) {
                 statusText.textContent = message;
             }
             
-            function sendRequest(endpoint) {
+            async function sendRequest(endpoint) {
                 const ipAddress = ipAddressInput.value.trim();
                 if (!ipAddress) {
                     updateStatus('Please enter an IP address');
                     return;
                 }
                 
-                const url = `http://${ipAddress}${endpoint}`;
-                
-                fetch(url)
-                    .then(response => {
-                        if (response.ok) {
-                            updateStatus(endpoint === '/find' ? 'Finding stick...' : 'Stopped');
-                        } else {
-                            throw new Error('Request failed');
+                try {
+                    const url = `http://${ipAddress}${endpoint}`;
+                    const response = await fetch(url, {
+                        mode: 'cors',
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'text/plain'
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        updateStatus('Connection error. Check IP address.');
                     });
+                    
+                    if (response.ok) {
+                        updateStatus(endpoint === '/find' ? 'Finding stick...' : 'Stopped');
+                    } else {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    if (window.location.protocol === 'https:') {
+                        updateStatus('Error: If using HTTPS, please allow insecure content or switch to HTTP');
+                    } else {
+                        updateStatus('Connection error. Check IP address and network.');
+                    }
+                }
             }
             
             findBtn.addEventListener('click', () => sendRequest('/find'));
