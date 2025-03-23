@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blind Stick Locator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f8fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .status-container {
+            margin: 30px 0;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .status {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .sub-status {
+            font-size: 16px;
+            color: #7f8c8d;
+        }
+        
+        .mic-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .mic-button:hover {
+            background-color: #2980b9;
+            transform: scale(1.05);
+        }
+        
+        .mic-button:active {
+            transform: scale(0.95);
+        }
+        
+        .mic-button svg {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .mic-button.listening {
+            background-color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(231, 76, 60, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+            }
+        }
+        
+        .settings {
+            margin-top: 30px;
+            text-align: left;
+        }
+        
+        .settings h2 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        .settings input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .help {
+            margin-top: 20px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .mic-container{
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Blind Stick Locator</h1>
+        
+        <div class="status-container">
+            <div class="status" id="status">Ready</div>
+            <div class="sub-status" id="sub-status">Press the button and say "Where is my stick"</div>
+        </div>
+        
+        <div class="mic-container">
+            <button class="mic-button" id="micButton">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="settings">
+            <h2>Settings</h2>
+            <input type="text" id="ipAddress" placeholder="Blind Stick IP Address" value="192.168.1.100">
+        </div>
+        
+        <div class="help">
+            <p>Trigger phrase: <strong>"Where is my stick"</strong></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const micButton = document.getElementById('micButton');
+            const statusText = document.getElementById('status');
+            const subStatusText = document.getElementById('sub-status');
+            const ipAddressInput = document.getElementById('ipAddress');
+            
+            let recognition;
+            let isListening = false;
+            
+            // Check if browser supports speech recognition
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                // Initialize speech synthesis
+                const synth = window.speechSynthesis;
+                
+                // Speak function
+                function speak(text) {
+                    if (synth.speaking) {
+                        synth.cancel();
+                    }
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    synth.speak(utterance);
+                }
+                
+                // Initiate the voice recognition
+                micButton.addEventListener('click', function() {
+                    if (!isListening) {
+                        startListening();
+                    } else {
+                        stopListening();
+                    }
+                });
+                
+                function startListening() {
+                    try {
+                        recognition.start();
+                        isListening = true;
+                        micButton.classList.add('listening');
+                        updateStatus('Listening...', 'Say "Where is my stick"');
+                        speak('Listening...');
+                    } catch (error) {
+                        console.error('Error starting recognition:', error);
+                        updateStatus('Error', 'Could not start listening');
+                    }
+                }
+                
+                function stopListening() {
+                    recognition.stop();
+                    isListening = false;
+                    micButton.classList.remove('listening');
+                    updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                }
+                
+                // When a result is recognized
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript.toLowerCase().trim();
+                    console.log('Heard:', transcript);
+                    
+                    if (transcript.includes('where is my stick') || 
+                        transcript.includes('where\'s my stick') || 
+                        transcript.includes('find my stick')) {
+                        
+                        updateStatus('Finding...', 'Sending request to your blind stick');
+                        speak('Finding your stick');
+                        findStick();
+                    } else {
+                        updateStatus('Not understood', 'Please try again');
+                        speak('I didn\'t understand, try again');
+                        setTimeout(() => {
+                            updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                        }, 3000);
+                    }
+                };
+                
+                // When the recognition is ended
+                recognition.onend = function() {
+                    isListening = false;
+                    micButton.classList.remove('listening');
+                };
+                
+                // When an error occurs
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error:', event.error);
+                    isListening = false;
+                    micButton.classList.remove('listening');
+                    
+                    if (event.error === 'no-speech') {
+                        updateStatus('No speech detected', 'Please try again');
+                        speak('No speech detected, please try again');
+                    } else {
+                        updateStatus('Error', event.error);
+                        speak('Error occurred, please try again');
+                    }
+                    
+                    setTimeout(() => {
+                        updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                    }, 3000);
+                };
+                
+                // Function to find the stick (send request to the IP)
+                function findStick() {
+                    const ipAddress = ipAddressInput.value.trim();
+                    
+                    if (!ipAddress) {
+                        updateStatus('Error', 'Please enter an IP address');
+                        speak('Please enter an IP address for your stick');
+                        return;
+                    }
+                    
+                    // Construct the URL
+                    const url = `http://${ipAddress}/find`;
+                    
+                    // Send a request to the blind stick
+                    fetch(url)
+                        .then(response => {
+                            if (response.ok) {
+                                updateStatus('Success!', 'Stick location request sent');
+                                speak('Stick location request sent successfully');
+                            } else {
+                                throw new Error(`Server responded with status: ${response.status}`);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error finding stick:', error);
+                            updateStatus('Connection error', 'Could not connect to your stick');
+                            speak('Connection error. Could not connect to your stick');
+                        })
+                        .finally(() => {
+                            setTimeout(() => {
+                                updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                            }, 5000);
+                        });
+                }
+                
+            } else {
+                // Browser doesn't support speech recognition
+                updateStatus('Not supported', 'Your browser does not support voice recognition');
+                micButton.disabled = true;
+                micButton.style.backgroundColor = '#ccc';
+                micButton.style.cursor = 'not-allowed';
+            }
+            
+            // Helper function to update status text
+            function updateStatus(status, subStatus) {
+                statusText.textContent = status;
+                subStatusText.textContent = subStatus || '';
+            }
+        });
+    </script>
+</body>
+</html>
