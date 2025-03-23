@@ -40,80 +40,50 @@
         
         .status-container {
             margin: 30px 0;
-            min-height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            min-height: 60px;
         }
         
         .status {
-            font-size: 28px;
-            font-weight: bold;
-            color: #3498db;
-            margin-bottom: 10px;
-        }
-        
-        .sub-status {
-            font-size: 16px;
+            font-size: 18px;
             color: #7f8c8d;
         }
         
-        .mic-button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            cursor: pointer;
+        .button-container {
             display: flex;
-            align-items: center;
+            gap: 20px;
             justify-content: center;
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
         
-        .mic-button:hover {
-            background-color: #2980b9;
+        .find-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .stop-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .btn:hover {
             transform: scale(1.05);
         }
         
-        .mic-button:active {
+        .btn:active {
             transform: scale(0.95);
-        }
-        
-        .mic-button svg {
-            width: 32px;
-            height: 32px;
-        }
-        
-        .mic-button.listening {
-            background-color: #e74c3c;
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
-            }
-            70% {
-                box-shadow: 0 0 0 15px rgba(231, 76, 60, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
-            }
         }
         
         .settings {
             margin-top: 30px;
-            text-align: left;
-        }
-        
-        .settings h2 {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 15px;
         }
         
         .settings input {
@@ -121,47 +91,7 @@
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            margin-bottom: 10px;
-        }
-        
-        .help {
-            margin-top: 20px;
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-        .mic-container{
-            display: flex;
-            justify-content: center;
-        }
-        
-        /* Mobile enhancements */
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .mic-button {
-                width: 100px;
-                height: 100px;
-            }
-            
-            .mic-button svg {
-                width: 40px;
-                height: 40px;
-            }
-            
-            .status {
-                font-size: 24px;
-            }
-        }
-        
-        /* Status message visual feedback */
-        .status-container.error .status {
-            color: #e74c3c;
-        }
-        
-        .status-container.success .status {
-            color: #2ecc71;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -169,311 +99,56 @@
     <div class="container">
         <h1>Blind Stick Locator</h1>
         
-        <div class="status-container" id="statusContainer">
-            <div class="status" id="status">Ready</div>
-            <div class="sub-status" id="sub-status">Press the button and say "Where is my stick"</div>
+        <div class="status-container">
+            <div class="status" id="status">Ready to locate your stick</div>
         </div>
         
-        <div class="mic-container">
-            <button class="mic-button" id="micButton">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                    <line x1="12" y1="19" x2="12" y2="23"></line>
-                    <line x1="8" y1="23" x2="16" y2="23"></line>
-                </svg>
-            </button>
+        <div class="button-container">
+            <button class="btn find-btn" id="findBtn">Find Stick</button>
+            <button class="btn stop-btn" id="stopBtn">Stop</button>
         </div>
         
         <div class="settings">
-            <h2>Settings</h2>
-            <input type="text" id="ipAddress" placeholder="Blind Stick IP Address" value="192.168.208.243">
-        </div>
-        
-        <div class="help">
-            <p>Trigger phrase: <strong>"Where is my stick"</strong></p>
+            <input type="text" id="ipAddress" placeholder="Blind Stick IP Address" value="192.168.168.243">
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const micButton = document.getElementById('micButton');
+            const findBtn = document.getElementById('findBtn');
+            const stopBtn = document.getElementById('stopBtn');
             const statusText = document.getElementById('status');
-            const subStatusText = document.getElementById('sub-status');
-            const statusContainer = document.getElementById('statusContainer');
             const ipAddressInput = document.getElementById('ipAddress');
             
-            let recognition;
-            let isListening = false;
-            let speechInitialized = false;
-            const synth = window.speechSynthesis;
-            let utterance;
-            
-            // Function to check for iOS
-            function isIOS() {
-                return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            function updateStatus(message) {
+                statusText.textContent = message;
             }
             
-            // Function to check for Android
-            function isAndroid() {
-                return /Android/.test(navigator.userAgent);
-            }
-            
-            // Initialize speech synthesis
-            function initSpeech() {
-                if (speechInitialized) return;
-                
-                // For Chrome on Android, we need a user interaction
-                if (isAndroid() && /Chrome/.test(navigator.userAgent)) {
-                    document.addEventListener('touchstart', function initTouch() {
-                        utterance = new SpeechSynthesisUtterance('');
-                        synth.speak(utterance);
-                        document.removeEventListener('touchstart', initTouch);
-                        speechInitialized = true;
-                    }, { once: true });
-                } else {
-                    utterance = new SpeechSynthesisUtterance('');
-                    utterance.volume = 0;
-                    synth.speak(utterance);
-                    speechInitialized = true;
-                }
-            }
-            
-            // Speak function with better mobile support
-            function speak(text) {
-                // Cancel any ongoing speech
-                synth.cancel();
-                
-                // Create a new utterance
-                utterance = new SpeechSynthesisUtterance(text);
-                
-                // Set speech properties for better mobile compatibility
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                utterance.volume = 1.0;
-                
-                // Add error handling
-                utterance.onerror = (event) => {
-                    console.error('Speech synthesis error:', event);
-                };
-
-                // For Chrome on Android, ensure we resume audio context
-                if (isAndroid() && /Chrome/.test(navigator.userAgent)) {
-                    // Add a small delay for mobile Chrome
-                    setTimeout(() => {
-                        synth.speak(utterance);
-                    }, 100);
-                } else {
-                    synth.speak(utterance);
+            function sendRequest(endpoint) {
+                const ipAddress = ipAddressInput.value.trim();
+                if (!ipAddress) {
+                    updateStatus('Please enter an IP address');
+                    return;
                 }
                 
-                // Visual feedback for spoken text
-                console.log('Speaking:', text);
-            }
-            
-            // Check if browser supports speech recognition
-            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
+                const url = `http://${ipAddress}${endpoint}`;
                 
-                // Set up recognition options - shorter timeouts for mobile
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                recognition.lang = 'en-US';
-                recognition.maxAlternatives = 3; // Get multiple alternatives to improve accuracy
-                
-                // Mobile devices often need shorter recognition timeouts
-                if (isIOS() || isAndroid()) {
-                    recognition.continuous = false;  // Mobile works better with non-continuous mode
-                }
-                
-                // Initiate the voice recognition
-                micButton.addEventListener('click', function() {
-                    // Initialize speech on first interaction (required by most mobile browsers)
-                    initSpeech();
-                    
-                    if (!isListening) {
-                        startListening();
-                    } else {
-                        stopListening();
-                    }
-                });
-                
-                function startListening() {
-                    try {
-                        // Make sure any ongoing recognition is stopped
-                        try {
-                            recognition.abort();
-                        } catch (e) {}
-                        
-                        // Start new recognition
-                        recognition.start();
-                        isListening = true;
-                        micButton.classList.add('listening');
-                        updateStatus('Listening...', 'Say "Where is my stick"', 'listening');
-                        speak('Listening');
-                    } catch (error) {
-                        console.error('Error starting recognition:', error);
-                        updateStatus('Error', 'Could not start listening. Try tapping again.', 'error');
-                        speak('Could not start listening. Try tapping again.');
-                    }
-                }
-                
-                function stopListening() {
-                    try {
-                        recognition.stop();
-                    } catch (e) {
-                        console.error('Error stopping recognition:', e);
-                    }
-                    
-                    isListening = false;
-                    micButton.classList.remove('listening');
-                    updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
-                }
-                
-                // When a result is recognized
-                recognition.onresult = function(event) {
-                    let recognized = false;
-                    let bestTranscript = '';
-                    
-                    // Check all alternatives
-                    for (let i = 0; i < event.results[0].length; i++) {
-                        const transcript = event.results[0][i].transcript.toLowerCase().trim();
-                        console.log(`Alternative ${i}:`, transcript);
-                        
-                        if (transcript.includes('where is my stick') || 
-                            transcript.includes('where\'s my stick') || 
-                            transcript.includes('find my stick') ||
-                            transcript.includes('find stick') ||
-                            transcript.includes('where stick')) {
-                            
-                            recognized = true;
-                            bestTranscript = transcript;
-                            break;
+                fetch(url)
+                    .then(response => {
+                        if (response.ok) {
+                            updateStatus(endpoint === '/find' ? 'Finding stick...' : 'Stopped');
+                        } else {
+                            throw new Error('Request failed');
                         }
-                        
-                        // Keep the best transcript for feedback
-                        if (i === 0) {
-                            bestTranscript = transcript;
-                        }
-                    }
-                    
-                    if (recognized) {
-                        updateStatus('Finding...', 'Sending request to your blind stick', 'finding');
-                        speak('Finding your stick');
-                        findStick();
-                    } else {
-                        console.log('Heard but not recognized:', bestTranscript);
-                        updateStatus('Not understood', 'Heard: "' + bestTranscript + '". Please try again.', 'error');
-                        speak('I didn\'t understand. Please try again');
-                        setTimeout(() => {
-                            updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
-                        }, 3000);
-                    }
-                };
-                
-                // When the recognition is ended
-                recognition.onend = function() {
-                    console.log('Recognition ended');
-                    isListening = false;
-                    micButton.classList.remove('listening');
-                    
-                    // Don't update status here as it might override result status
-                };
-                
-                // When an error occurs
-                recognition.onerror = function(event) {
-                    console.error('Speech recognition error:', event.error);
-                    isListening = false;
-                    micButton.classList.remove('listening');
-                    
-                    if (event.error === 'no-speech') {
-                        updateStatus('No speech detected', 'Please try again', 'error');
-                        speak('No speech detected. Please try again');
-                    } else if (event.error === 'network') {
-                        updateStatus('Network error', 'Check your internet connection', 'error');
-                        speak('Network error. Please check your connection');
-                    } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-                        updateStatus('Microphone blocked', 'Please allow microphone access', 'error');
-                        speak('Microphone access is blocked. Please check your browser settings');
-                    } else {
-                        updateStatus('Error', event.error, 'error');
-                        speak('Error occurred. Please try again');
-                    }
-                    
-                    setTimeout(() => {
-                        updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
-                    }, 3000);
-                };
-                
-                // Function to find the stick (send request to the IP)
-                function findStick() {
-                    const ipAddress = ipAddressInput.value.trim();
-                    
-                    if (!ipAddress) {
-                        updateStatus('Error', 'Please enter an IP address', 'error');
-                        speak('Please enter an IP address for your stick');
-                        return;
-                    }
-                    
-                    // Construct the URL
-                    const url = `http://${ipAddress}/find`;
-                    
-                    // Send a request to the blind stick
-                    fetch(url)
-                        .then(response => {
-                            if (response.ok) {
-                                updateStatus('Success!', 'Stick location request sent', 'success');
-                                speak('Stick location request sent successfully');
-                            } else {
-                                throw new Error(`Server responded with status: ${response.status}`);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error finding stick:', error);
-                            updateStatus('Connection error', 'Could not connect to your stick', 'error');
-                            speak('Connection error. Could not connect to your stick');
-                        })
-                        .finally(() => {
-                            setTimeout(() => {
-                                updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
-                            }, 5000);
-                        });
-                }
-                
-            } else {
-                // Browser doesn't support speech recognition
-                updateStatus('Not supported', 'Your browser does not support voice recognition', 'error');
-                micButton.disabled = true;
-                micButton.style.backgroundColor = '#ccc';
-                micButton.style.cursor = 'not-allowed';
-                speak('Your browser does not support voice recognition');
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        updateStatus('Connection error. Check IP address.');
+                    });
             }
             
-            // Helper function to update status text with better visual feedback
-            function updateStatus(status, subStatus, type) {
-                statusText.textContent = status;
-                subStatusText.textContent = subStatus || '';
-                
-                // Clear existing classes
-                statusContainer.classList.remove('error', 'success', 'listening', 'finding', 'ready');
-                
-                // Add type-specific class
-                if (type) {
-                    statusContainer.classList.add(type);
-                }
-                
-                console.log('Status updated:', status, subStatus);
-            }
-            
-            // Add a visible debug function for mobile
-            window.debugApp = function(message) {
-                console.log('DEBUG:', message);
-                updateStatus('Debug', message, 'error');
-                setTimeout(() => {
-                    updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
-                }, 3000);
-            };
+            findBtn.addEventListener('click', () => sendRequest('/find'));
+            stopBtn.addEventListener('click', () => sendRequest('/stop'));
         });
     </script>
 </body>
