@@ -133,13 +133,43 @@
             display: flex;
             justify-content: center;
         }
+        
+        /* Mobile enhancements */
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .mic-button {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .mic-button svg {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .status {
+                font-size: 24px;
+            }
+        }
+        
+        /* Status message visual feedback */
+        .status-container.error .status {
+            color: #e74c3c;
+        }
+        
+        .status-container.success .status {
+            color: #2ecc71;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Blind Stick Locator</h1>
         
-        <div class="status-container">
+        <div class="status-container" id="statusContainer">
             <div class="status" id="status">Ready</div>
             <div class="sub-status" id="sub-status">Press the button and say "Where is my stick"</div>
         </div>
@@ -170,34 +200,81 @@
             const micButton = document.getElementById('micButton');
             const statusText = document.getElementById('status');
             const subStatusText = document.getElementById('sub-status');
+            const statusContainer = document.getElementById('statusContainer');
             const ipAddressInput = document.getElementById('ipAddress');
             
             let recognition;
             let isListening = false;
+            let speechInitialized = false;
+            const synth = window.speechSynthesis;
+            let utterance;
+            
+            // Function to check for iOS
+            function isIOS() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            }
+            
+            // Function to check for Android
+            function isAndroid() {
+                return /Android/.test(navigator.userAgent);
+            }
+            
+            // Initialize speech synthesis
+            function initSpeech() {
+                if (speechInitialized) return;
+                
+                // Create a silent utterance to initialize speech on mobile
+                utterance = new SpeechSynthesisUtterance('');
+                utterance.volume = 0;
+                synth.speak(utterance);
+                speechInitialized = true;
+            }
+            
+            // Speak function with better mobile support
+            function speak(text) {
+                // Cancel any ongoing speech
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                
+                // Create a new utterance
+                utterance = new SpeechSynthesisUtterance(text);
+                
+                // Workaround for iOS
+                if (isIOS()) {
+                    // iOS often needs a small delay
+                    setTimeout(() => {
+                        synth.speak(utterance);
+                    }, 100);
+                } else {
+                    synth.speak(utterance);
+                }
+                
+                // Visual feedback for spoken text
+                console.log('Speaking:', text);
+            }
             
             // Check if browser supports speech recognition
             if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
+                
+                // Set up recognition options - shorter timeouts for mobile
                 recognition.continuous = false;
                 recognition.interimResults = false;
                 recognition.lang = 'en-US';
+                recognition.maxAlternatives = 3; // Get multiple alternatives to improve accuracy
                 
-                // Initialize speech synthesis
-                const synth = window.speechSynthesis;
-                
-                // Speak function
-                function speak(text) {
-                    if (synth.speaking) {
-                        synth.cancel();
-                    }
-                    
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    synth.speak(utterance);
+                // Mobile devices often need shorter recognition timeouts
+                if (isIOS() || isAndroid()) {
+                    recognition.continuous = false;  // Mobile works better with non-continuous mode
                 }
                 
                 // Initiate the voice recognition
                 micButton.addEventListener('click', function() {
+                    // Initialize speech on first interaction (required by most mobile browsers)
+                    initSpeech();
+                    
                     if (!isListening) {
                         startListening();
                     } else {
@@ -207,49 +284,84 @@
                 
                 function startListening() {
                     try {
+                        // Make sure any ongoing recognition is stopped
+                        try {
+                            recognition.abort();
+                        } catch (e) {}
+                        
+                        // Start new recognition
                         recognition.start();
                         isListening = true;
                         micButton.classList.add('listening');
-                        updateStatus('Listening...', 'Say "Where is my stick"');
-                        speak('Listening...');
+                        updateStatus('Listening...', 'Say "Where is my stick"', 'listening');
+                        speak('Listening');
                     } catch (error) {
                         console.error('Error starting recognition:', error);
-                        updateStatus('Error', 'Could not start listening');
+                        updateStatus('Error', 'Could not start listening. Try tapping again.', 'error');
+                        speak('Could not start listening. Try tapping again.');
                     }
                 }
                 
                 function stopListening() {
-                    recognition.stop();
+                    try {
+                        recognition.stop();
+                    } catch (e) {
+                        console.error('Error stopping recognition:', e);
+                    }
+                    
                     isListening = false;
                     micButton.classList.remove('listening');
-                    updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                    updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
                 }
                 
                 // When a result is recognized
                 recognition.onresult = function(event) {
-                    const transcript = event.results[0][0].transcript.toLowerCase().trim();
-                    console.log('Heard:', transcript);
+                    let recognized = false;
+                    let bestTranscript = '';
                     
-                    if (transcript.includes('where is my stick') || 
-                        transcript.includes('where\'s my stick') || 
-                        transcript.includes('find my stick')) {
+                    // Check all alternatives
+                    for (let i = 0; i < event.results[0].length; i++) {
+                        const transcript = event.results[0][i].transcript.toLowerCase().trim();
+                        console.log(`Alternative ${i}:`, transcript);
                         
-                        updateStatus('Finding...', 'Sending request to your blind stick');
+                        if (transcript.includes('where is my stick') || 
+                            transcript.includes('where\'s my stick') || 
+                            transcript.includes('find my stick') ||
+                            transcript.includes('find stick') ||
+                            transcript.includes('where stick')) {
+                            
+                            recognized = true;
+                            bestTranscript = transcript;
+                            break;
+                        }
+                        
+                        // Keep the best transcript for feedback
+                        if (i === 0) {
+                            bestTranscript = transcript;
+                        }
+                    }
+                    
+                    if (recognized) {
+                        updateStatus('Finding...', 'Sending request to your blind stick', 'finding');
                         speak('Finding your stick');
                         findStick();
                     } else {
-                        updateStatus('Not understood', 'Please try again');
-                        speak('I didn\'t understand, try again');
+                        console.log('Heard but not recognized:', bestTranscript);
+                        updateStatus('Not understood', 'Heard: "' + bestTranscript + '". Please try again.', 'error');
+                        speak('I didn\'t understand. Please try again');
                         setTimeout(() => {
-                            updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                            updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
                         }, 3000);
                     }
                 };
                 
                 // When the recognition is ended
                 recognition.onend = function() {
+                    console.log('Recognition ended');
                     isListening = false;
                     micButton.classList.remove('listening');
+                    
+                    // Don't update status here as it might override result status
                 };
                 
                 // When an error occurs
@@ -259,15 +371,21 @@
                     micButton.classList.remove('listening');
                     
                     if (event.error === 'no-speech') {
-                        updateStatus('No speech detected', 'Please try again');
-                        speak('No speech detected, please try again');
+                        updateStatus('No speech detected', 'Please try again', 'error');
+                        speak('No speech detected. Please try again');
+                    } else if (event.error === 'network') {
+                        updateStatus('Network error', 'Check your internet connection', 'error');
+                        speak('Network error. Please check your connection');
+                    } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+                        updateStatus('Microphone blocked', 'Please allow microphone access', 'error');
+                        speak('Microphone access is blocked. Please check your browser settings');
                     } else {
-                        updateStatus('Error', event.error);
-                        speak('Error occurred, please try again');
+                        updateStatus('Error', event.error, 'error');
+                        speak('Error occurred. Please try again');
                     }
                     
                     setTimeout(() => {
-                        updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                        updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
                     }, 3000);
                 };
                 
@@ -276,7 +394,7 @@
                     const ipAddress = ipAddressInput.value.trim();
                     
                     if (!ipAddress) {
-                        updateStatus('Error', 'Please enter an IP address');
+                        updateStatus('Error', 'Please enter an IP address', 'error');
                         speak('Please enter an IP address for your stick');
                         return;
                     }
@@ -288,7 +406,7 @@
                     fetch(url)
                         .then(response => {
                             if (response.ok) {
-                                updateStatus('Success!', 'Stick location request sent');
+                                updateStatus('Success!', 'Stick location request sent', 'success');
                                 speak('Stick location request sent successfully');
                             } else {
                                 throw new Error(`Server responded with status: ${response.status}`);
@@ -296,29 +414,49 @@
                         })
                         .catch(error => {
                             console.error('Error finding stick:', error);
-                            updateStatus('Connection error', 'Could not connect to your stick');
+                            updateStatus('Connection error', 'Could not connect to your stick', 'error');
                             speak('Connection error. Could not connect to your stick');
                         })
                         .finally(() => {
                             setTimeout(() => {
-                                updateStatus('Ready', 'Press the button and say "Where is my stick"');
+                                updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
                             }, 5000);
                         });
                 }
                 
             } else {
                 // Browser doesn't support speech recognition
-                updateStatus('Not supported', 'Your browser does not support voice recognition');
+                updateStatus('Not supported', 'Your browser does not support voice recognition', 'error');
                 micButton.disabled = true;
                 micButton.style.backgroundColor = '#ccc';
                 micButton.style.cursor = 'not-allowed';
+                speak('Your browser does not support voice recognition');
             }
             
-            // Helper function to update status text
-            function updateStatus(status, subStatus) {
+            // Helper function to update status text with better visual feedback
+            function updateStatus(status, subStatus, type) {
                 statusText.textContent = status;
                 subStatusText.textContent = subStatus || '';
+                
+                // Clear existing classes
+                statusContainer.classList.remove('error', 'success', 'listening', 'finding', 'ready');
+                
+                // Add type-specific class
+                if (type) {
+                    statusContainer.classList.add(type);
+                }
+                
+                console.log('Status updated:', status, subStatus);
             }
+            
+            // Add a visible debug function for mobile
+            window.debugApp = function(message) {
+                console.log('DEBUG:', message);
+                updateStatus('Debug', message, 'error');
+                setTimeout(() => {
+                    updateStatus('Ready', 'Press the button and say "Where is my stick"', 'ready');
+                }, 3000);
+            };
         });
     </script>
 </body>

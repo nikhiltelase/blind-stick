@@ -98,6 +98,7 @@ def handle_request(client):
     global finding_mode, last_find_request
     
     try:
+        client.settimeout(3.0)  # Set timeout for client operations
         request = client.recv(1024)
         request = request.decode('utf-8')
         
@@ -139,11 +140,21 @@ def handle_request(client):
             response += "<html><body><h1>Blind Stick Server</h1><p>Use /find to locate the stick</p></body></html>"
             client.send(response)
             
+    except socket.timeout:
+        print("Request timed out")
+    except OSError as e:
+        if e.errno == 110:  # ETIMEDOUT
+            print("Connection timed out")
+        else:
+            print("Network error:", e)
     except Exception as e:
         print("Error handling request:", e)
         
     finally:
-        client.close()
+        try:
+            client.close()
+        except:
+            pass  # Ignore errors when closing an already closed connection
 
 # Main function
 def main():
